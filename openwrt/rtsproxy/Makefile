@@ -12,17 +12,9 @@ include $(INCLUDE_DIR)/meson.mk
 define Package/rtsproxy
   SECTION:=net
   CATEGORY:=Network
-  SUBMENU:=Web Servers/Proxies
   TITLE:=High Performance RTSP Proxy
-  URL:=https://github.com/plsy1/rtsproxy
   DEPENDS:=+libstdcpp +libpthread
-  PKGARCH:=*
 endef
-
-MESON_ARGS += \
-	-Dbuildtype=release \
-	-Dstrip=true \
-	-Db_lto=true
 
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
