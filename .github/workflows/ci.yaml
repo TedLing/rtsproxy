@@ -132,7 +132,9 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG_NAME="${{ github.event.release.tag_name }}"
           else
-            TAG_NAME="${{ github.ref_name }}"
+            # 手动触发时，使用分支名+时间戳作为 tag
+            TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+            TAG_NAME="${{ github.ref_name }}-${TIMESTAMP}"
           fi
           
           # 移除 v 前缀
@@ -157,16 +159,22 @@ jobs:
             [ -f "$file" ] || continue
             upx --best --lzma "$file"
           done
+          
+          # 保存 TAG_NAME 供后续步骤使用
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+      - name: Create Release (for manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TAG_NAME" \
+            --title "Build from ${{ github.ref_name }} ($TAG_NAME)" \
+            --notes "Auto-generated build from branch ${{ github.ref_name }} at $(date)" \
+            --target "${{ github.sha }}"
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG_NAME="${{ github.event.release.tag_name }}"
-          else
-            TAG_NAME="${{ github.ref_name }}"
-          fi
-
           for i in release/rtsproxy-*; do
             gh release upload "$TAG_NAME" "$i" --clobber
           done
