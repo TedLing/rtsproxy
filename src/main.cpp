@@ -309,7 +309,13 @@ int main(int argc, char *argv[])
                         close(client_fd);
                     } else {
                         // Error occurred
-                        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            // Data not available yet, this is normal for non-blocking socket
+                            // Keep the fd in epoll and wait for next EPOLLIN event
+                            Logger::debug("[SERVER] No data available yet, waiting for next event");
+                            return; // Don't close the connection, just return
+                        } else {
+                            // Real error occurred
                             Logger::error("[SERVER] Protocol detection recv failed: " + std::string(strerror(errno)));
                             loop.remove(client_fd);
                             close(client_fd);

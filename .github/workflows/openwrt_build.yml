@@ -1,4 +1,4 @@
-name: Build OpenWrt Packages
+name: Build ImmortalWrt MT7981 Package
 
 on:
   release:
@@ -11,20 +11,17 @@ env:
 
 jobs:
   build:
-    name: Build for ${{ matrix.arch }}
+    name: Build for ImmortalWrt MT7981
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: 23.05-x64
-            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-sdk-23.05.5-x86-64_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-          - arch: 23.05-aarch64
-            sdk_url: https://downloads.openwrt.org/releases/23.05.5/targets/rockchip/armv8/openwrt-sdk-23.05.5-rockchip-armv8_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-          - arch: 24.10-x64
-            sdk_url: https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-sdk-24.10.4-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-          - arch: 24.10-aarch64
-            sdk_url: https://downloads.openwrt.org/releases/24.10.4/targets/rockchip/armv8/openwrt-sdk-24.10.4-rockchip-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+          # ImmortalWrt for MT798x (MediaTek Filogic 830)
+          - arch: mt7981
+            sdk_url: https://github.com/Yuzhii0718/immortalwrt-mt798x-6.6-padavanonly.git
+            is_git: true
+            git_branch: main
 
     steps:
       - name: Checkout
@@ -40,15 +37,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: sdk
-          key: sdk-${{ matrix.arch }}-${{ hashFiles('**/Makefile') }}
+          key: sdk-immortalwrt-mt7981-${{ hashFiles('**/Makefile') }}
 
       - name: Download and setup SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
-          mkdir sdk
-          wget -q ${{ matrix.sdk_url }}
-          tar xf openwrt-sdk-*.tar.* -C sdk --strip-components=1
-          rm openwrt-sdk-*.tar.*
+          # Clone ImmortalWrt MT798x repository
+          git clone --depth 1 --branch ${{ matrix.git_branch }} ${{ matrix.sdk_url }} sdk
           cd sdk
           ./scripts/feeds update -a
           ./scripts/feeds install -a
@@ -91,6 +86,8 @@ jobs:
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VERSION_FULL/" package/rtsproxy/Makefile
           sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VERSION_FULL/" package/luci-app-rtsproxy/Makefile
 
+          # Ensure meson and ninja are available for ImmortalWrt
+          ./scripts/feeds install meson ninja 2>/dev/null || true
 
           # 配置并编译
           echo "CONFIG_PACKAGE_rtsproxy=y" >> .config
@@ -109,9 +106,13 @@ jobs:
           fi
           VERSION_FULL="${TAG_NAME#v}"
           mkdir -p output
+          
+          # Platform name for artifact naming
+          PLATFORM_NAME="immortalwrt-mt7981"
+          
           # 收集本体 (排除调试包)
           for file in $(find sdk/bin/packages/ -name "rtsproxy*.ipk" ! -name "luci-app-rtsproxy*" ! -name "*-dbgsym*"); do
-            cp "$file" "output/rtsproxy_${VERSION_FULL}_openwrt-${{ matrix.arch }}.ipk"
+            cp "$file" "output/rtsproxy_${VERSION_FULL}_${PLATFORM_NAME}.ipk"
           done
           # 收集 LuCI (排除调试包)
           for file in $(find sdk/bin/packages/ -name "luci-app-rtsproxy*.ipk" ! -name "*-dbgsym*"); do
@@ -121,7 +122,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rtsproxy-ipk-${{ matrix.arch }}
+          name: rtsproxy-ipk-mt7981
           path: output/*.ipk
 
   release:
