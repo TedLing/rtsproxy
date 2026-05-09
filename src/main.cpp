@@ -302,6 +302,18 @@ int main(int argc, char *argv[])
                             // Assume RTSP for other methods like OPTIONS, DESCRIBE, SETUP...
                             handle_rtsp_request(client_fd, client_addr, &loop, pool);
                         }
+                    } else if (n == 0) {
+                        // Connection closed by peer
+                        Logger::debug("[SERVER] Client disconnected during protocol detection");
+                        loop.remove(client_fd);
+                        close(client_fd);
+                    } else {
+                        // Error occurred
+                        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                            Logger::error("[SERVER] Protocol detection recv failed: " + std::string(strerror(errno)));
+                            loop.remove(client_fd);
+                            close(client_fd);
+                        }
                     }
                 }
             };
